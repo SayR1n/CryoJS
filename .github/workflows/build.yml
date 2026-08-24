@@ -1,0 +1,81 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x64
+          - os: ubuntu-latest
+            platform: linux-x64
+          - os: macos-latest
+            platform: macos-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Package
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            bin="build/Release"
+            ext=".exe"
+          else
+            bin="build"
+            ext=""
+          fi
+          name="CryoJS-${{ github.ref_name }}-${{ matrix.platform }}"
+          mkdir -p "dist/$name"
+          cp "$bin/CryoJS$ext" "dist/$name/"
+          cp "$bin/cryopack$ext" "dist/$name/"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            powershell -NoProfile -Command "Compress-Archive -Path 'dist/$name' -DestinationPath '$name.zip'"
+          else
+            (cd dist && zip -qr "../$name.zip" "$name")
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CryoJS-${{ github.ref_name }}-${{ matrix.platform }}
+          path: CryoJS-*.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
