@@ -93,6 +93,19 @@ static bool loadResource(const std::string& path, const std::string& password) {
         std::cerr << "[CryoJS] Wrong password or corrupted data\n";
         return false;
     }
+
+    bool paddingValid = true;
+    for (size_t i = encrypted.size() - padByte; i < encrypted.size(); i++) {
+        if (encrypted[i] != padByte) {
+            paddingValid = false;
+            break;
+        }
+    }
+    if (!paddingValid) {
+        std::cerr << "[CryoJS] Wrong password or corrupted data\n";
+        return false;
+    }
+
     size_t plainSize = encrypted.size() - padByte;
     const uint8_t* plain = encrypted.data();
 

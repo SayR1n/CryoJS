@@ -5,7 +5,7 @@
 #include <string>
 #include <cstring>
 #include <cstdlib>
-#include <ctime>
+#include <random>
 #include <filesystem>
 #include <stdexcept>
 #include <algorithm>
@@ -52,9 +52,10 @@ static std::vector<uint8_t> pkcs7Pad(const std::vector<uint8_t>& data) {
 }
 
 static std::vector<uint8_t> randomBytes(size_t n) {
+    static std::random_device rd;
     std::vector<uint8_t> out(n);
     for (size_t i = 0; i < n; i++)
-        out[i] = static_cast<uint8_t>(rand() & 0xFF);
+        out[i] = static_cast<uint8_t>(rd());
     return out;
 }
 
@@ -96,8 +97,6 @@ int main(int argc, char* argv[]) {
         std::cerr << "[cryopack] Not a directory: " << inputDir << '\n';
         return 1;
     }
-
-    srand(static_cast<unsigned>(time(nullptr)));
 
     std::vector<FileEntry> files;
     try {
