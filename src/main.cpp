@@ -10,6 +10,7 @@
 
 #include "duktape.h"
 #include "aes.h"
+#include "miniz.h"
 #include "resource_format.h"
 
 namespace fs = std::filesystem;
@@ -51,14 +52,33 @@ static bool loadResource(const std::string& path, const std::string& password) {
         return false;
     }
 
-    if (memcmp(raw.data(), MAGIC, 4) != 0) {
+    bool v2 = false;
+    const uint8_t* magic = nullptr;
+    if (memcmp(raw.data(), MAGIC_V2, 4) == 0) {
+        magic = MAGIC_V2;
+        v2 = true;
+    } else if (memcmp(raw.data(), MAGIC_V1, 4) == 0) {
+        magic = MAGIC_V1;
+    } else {
         std::cerr << "[CryoJS] Invalid resource file\n";
         return false;
     }
 
     for (size_t i = 4; i < raw.size(); i++)
-        raw[i] ^= MAGIC[i % 4];
+        raw[i] ^= magic[i % 4];
 
+    uint8_t flags = 0;
+    if (v2) {
+        uint8_t version = raw[4];
+        flags = raw[5];
+        if (version != FORMAT_VERSION) {
+            std::cerr << "[CryoJS] Unsupported resource format version: "
+                      << static_cast<int>(version) << '\n';
+            return false;
+        }
+    }
+
+    // v1: 12 random padding bytes; v2: version + flags + 10 padding bytes
     size_t pos = 4 + 12;
 
     uint32_t fileCountObf = readU32LE(raw.data() + pos); pos += 4;
@@ -106,8 +126,41 @@ static bool loadResource(const std::string& path, const std::string& password) {
         return false;
     }
 
-    size_t plainSize = encrypted.size() - padByte;
-    const uint8_t* plain = encrypted.data();
+    size_t paddedSize = encrypted.size() - padByte;
+
+    const uint8_t* plain = nullptr;
+    size_t plainSize = 0;
+    std::vector<uint8_t> plainBuf;
+
+    if (flags & FLAG_COMPRESSED) {
+        if (paddedSize < 4) {
+            std::cerr << "[CryoJS] Wrong password or corrupted data\n";
+            return false;
+        }
+
+        uint32_t origSize = readU32LE(encrypted.data());
+        constexpr uint32_t MAX_ORIG_SIZE = 512u * 1024 * 1024;
+        if (origSize == 0 || origSize > MAX_ORIG_SIZE) {
+            std::cerr << "[CryoJS] Wrong password or corrupted data\n";
+            return false;
+        }
+
+        plainBuf.resize(origSize);
+        mz_ulong destLen = origSize;
+        mz_ulong srcLen  = paddedSize - 4;
+        if (mz_uncompress(plainBuf.data(), &destLen,
+                          encrypted.data() + 4, srcLen) != MZ_OK ||
+            destLen != origSize)
+        {
+            std::cerr << "[CryoJS] Failed to decompress resource payload\n";
+            return false;
+        }
+        plain = plainBuf.data();
+        plainSize = origSize;
+    } else {
+        plain = encrypted.data();
+        plainSize = paddedSize;
+    }
 
     if (plainSize < 8) {
         std::cerr << "[CryoJS] Wrong password or corrupted data\n";
@@ -201,6 +254,7 @@ static bool getCached(duk_context* ctx, const std::string& key) {
     return false;
 }
 
+// Caches the value currently on top of the stack; stack layout unchanged.
 static void putCache(duk_context* ctx, const std::string& key) {
     duk_push_heap_stash(ctx);
     duk_get_prop_string(ctx, -1, CACHE_KEY);
@@ -386,7 +440,6 @@ static bool executeModuleSource(duk_context* ctx,
     duk_dup(ctx, -1);
     duk_put_prop_string(ctx, -3, "exports");
 
-    duk_dup(ctx, -1);
     putCache(ctx, cacheKey);
 
     if (duk_peval_string(ctx, wrapped.c_str()) != 0) {
@@ -417,9 +470,7 @@ static bool executeModuleSource(duk_context* ctx,
 
     duk_get_prop_string(ctx, -2, "exports");
     duk_replace(ctx, -2);
-    duk_dup(ctx, -1);
     putCache(ctx, cacheKey);
-    duk_replace(ctx, -2);
 
     return true;
 }
