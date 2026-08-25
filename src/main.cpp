@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <stdexcept>
 #include <cstring>
+#include <cstdlib>
 
 #include "duktape.h"
 #include "aes.h"
@@ -571,6 +572,42 @@ static bool executeResource(duk_context* ctx, const std::string& entryPoint) {
     return true;
 }
 
+static duk_ret_t js_process_exit(duk_context* ctx) {
+    int code = duk_is_number(ctx, 0) ? static_cast<int>(duk_get_int(ctx, 0)) : 0;
+    std::exit(code);
+}
+
+static duk_ret_t js_process_cwd(duk_context* ctx) {
+    try {
+        std::string cwd = fs::current_path().string();
+        duk_push_string(ctx, cwd.c_str());
+    } catch (...) {
+        duk_push_string(ctx, ".");
+    }
+    return 1;
+}
+
+static void setupProcess(duk_context* ctx, const std::vector<std::string>& procArgv) {
+    duk_push_global_object(ctx);
+    duk_push_object(ctx);
+
+    duk_push_array(ctx);
+    for (size_t i = 0; i < procArgv.size(); i++) {
+        duk_push_string(ctx, procArgv[i].c_str());
+        duk_put_prop_index(ctx, -2, static_cast<duk_uarridx_t>(i));
+    }
+    duk_put_prop_string(ctx, -2, "argv");
+
+    duk_push_c_function(ctx, js_process_exit, 1);
+    duk_put_prop_string(ctx, -2, "exit");
+
+    duk_push_c_function(ctx, js_process_cwd, 0);
+    duk_put_prop_string(ctx, -2, "cwd");
+
+    duk_put_prop_string(ctx, -2, "process");
+    duk_pop(ctx);
+}
+
 static void printUsage() {
     std::cout << "Usage:\n";
     std::cout << "  CryoJS <script.js>                              Run a JS file\n";
@@ -611,6 +648,16 @@ int main(int argc, char* argv[]) {
     ensureCache(ctx);
     setupConsole(ctx);
     setupRequire(ctx);
+
+    std::vector<std::string> procArgv;
+    procArgv.push_back(argv[0]);
+    if (isResource) {
+        procArgv.push_back(arg1);
+    } else {
+        for (int i = 1; i < argc; i++)
+            procArgv.push_back(argv[i]);
+    }
+    setupProcess(ctx, procArgv);
 
     bool ok = false;
 
