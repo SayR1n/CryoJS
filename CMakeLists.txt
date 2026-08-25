@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(CryoJS VERSION 1.0.0 LANGUAGES C CXX)
+project(CryoJS VERSION 1.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -35,7 +35,7 @@ add_executable(CryoJS
 )
 target_link_libraries(CryoJS PRIVATE duktape miniz)
 target_include_directories(CryoJS PRIVATE third_party/duktape third_party/tiny-aes third_party/miniz src)
-target_compile_definitions(CryoJS PRIVATE ${AES_DEFS})
+target_compile_definitions(CryoJS PRIVATE ${AES_DEFS} CRYOJS_VERSION="${PROJECT_VERSION}")
 if(MSVC)
     set_source_files_properties(third_party/tiny-aes/aes.c PROPERTIES COMPILE_FLAGS "/W0")
 else()

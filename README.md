@@ -11,7 +11,7 @@ A lightweight JavaScript runtime built in C++ using [Duktape](https://duktape.or
 - Automatic `.js` extension and `index.js` directory fallback
 - Module cache — each file is loaded once per run
 - `module.exports` replacement support
-- `console.log`, `console.error`, `console.warn`
+- `console.log`, `console.info`, `console.error`, `console.warn`
 - `__filename` and `__dirname` available in every module
 - Full stack traces on runtime errors
 - **Pack your JS project into a single encrypted `.resource` file**
@@ -47,6 +47,11 @@ Outputs:
 ---
 
 ## Usage
+
+```bash
+CryoJS -h | --help        Show help
+CryoJS --version          Show version
+```
 
 ### Run a plain JS file
 

@@ -221,6 +221,9 @@ static void setupConsole(duk_context* ctx) {
     duk_push_c_function(ctx, js_console_log,   DUK_VARARGS);
     duk_put_prop_string(ctx, -2, "log");
 
+    duk_push_c_function(ctx, js_console_log,   DUK_VARARGS);
+    duk_put_prop_string(ctx, -2, "info");
+
     duk_push_c_function(ctx, js_console_error, DUK_VARARGS);
     duk_put_prop_string(ctx, -2, "error");
 
@@ -569,13 +572,27 @@ static bool executeResource(duk_context* ctx, const std::string& entryPoint) {
 }
 
 static void printUsage() {
-    std::cerr << "Usage:\n";
-    std::cerr << "  CryoJS <script.js>                              Run a JS file\n";
-    std::cerr << "  CryoJS <archive.resource> <password> [entry]   Run encrypted resource\n";
-    std::cerr << "         entry defaults to ./main.js if omitted\n";
+    std::cout << "Usage:\n";
+    std::cout << "  CryoJS <script.js>                              Run a JS file\n";
+    std::cout << "  CryoJS <archive.resource> <password> [entry]    Run encrypted resource\n";
+    std::cout << "         entry defaults to ./main.js if omitted\n";
+    std::cout << "  CryoJS -h | --help                              Show this help\n";
+    std::cout << "  CryoJS --version                                Show version\n";
 }
 
 int main(int argc, char* argv[]) {
+    if (argc >= 2) {
+        std::string flag = argv[1];
+        if (flag == "-h" || flag == "--help") {
+            printUsage();
+            return 0;
+        }
+        if (flag == "--version") {
+            std::cout << "CryoJS " << CRYOJS_VERSION << '\n';
+            return 0;
+        }
+    }
+
     if (argc < 2) {
         printUsage();
         return 1;
