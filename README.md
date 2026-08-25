@@ -1,5 +1,7 @@
 # CryoJS
 
+[![Build](https://github.com/SayR1n/CryoJS/actions/workflows/build.yml/badge.svg)](https://github.com/SayR1n/CryoJS/actions/workflows/build.yml)
+
 A lightweight JavaScript runtime built in C++ using [Duktape](https://duktape.org) as the embedded engine. Run plain `.js` files or pack your entire project into an encrypted `.resource` archive that only CryoJS can execute.
 
 ---
